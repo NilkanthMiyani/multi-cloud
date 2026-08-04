@@ -125,9 +125,6 @@ resource "helm_release" "redis" {
     var.redis.values_extra,
   ]
 
-  # standard-sc is created by this same layer; a PVC naming a class that
-  # does not exist yet sits Pending until Helm times out. Empty list on
-  # non-aws workspaces (count = 0), so this imposes no ordering there.
   depends_on = [kubernetes_storage_class_v1.standard_sc]
 
 }
