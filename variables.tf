@@ -59,25 +59,6 @@ variable "tags" {
 # --- AWS / EKS -------------------------------------------------------------
 # Flat variables (only consumed in the "aws" workspace).
 
-# Named profile from ~/.aws/credentials. Preferred over the keys below: it is
-# threaded through the provider, the kubeconfig command and the addon layer's
-# exec auth, so every AWS call in both layers uses one identity with no
-# environment variables involved. Blank uses the standard credential chain.
-variable "aws_profile" {
-  description = "AWS named profile to authenticate with. Blank uses the default credential chain."
-  type        = string
-  default     = ""
-
-  # Static keys take precedence over a profile in the AWS SDK, so setting both
-  # silently ignores the profile — and the kubeconfig still gets --profile,
-  # leaving terraform and kubectl on different identities. That is the exact
-  # split that produces a passing apply followed by a 401 from kubectl.
-  validation {
-    condition     = var.aws_profile == "" || var.aws_access_key == ""
-    error_message = "Set aws_profile OR aws_access_key/aws_secret_key, not both."
-  }
-}
-
 variable "aws_access_key" {
   description = "AWS access key. Leave blank to use the standard credential chain (env vars, shared config, instance profile)."
   type        = string

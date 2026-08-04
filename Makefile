@@ -40,6 +40,20 @@ VERBN   = $(words $(filter $(VERBS),$(MAKECMDGOALS)))
 WORKSPACE = $(CLOUD)-$(ENV)
 VARFILE   = envs/$(CLOUD).tfvars
 
+# The aws CLI cannot read tfvars. Anything that shells out to it — `kubeconfig`,
+# `connect`, and the addon layer's exec auth (`aws eks get-token`, run as a
+# terraform subprocess) — would otherwise authenticate as whatever
+# ~/.aws/credentials holds. If that is a different account you get "No cluster
+# found" or a 401, on a cluster that built perfectly.
+#
+# Expands to a VAR=val prefix when envs/aws.tfvars supplies non-blank keys, and
+# to nothing otherwise, leaving the normal credential chain in charge.
+AWS_CREDS = $(if $(filter aws,$(CLOUD)),$(shell awk -F'"' \
+  '/^aws_access_key/ && $$2 != "" { a = $$2 } \
+   /^aws_secret_key/ && $$2 != "" { s = $$2 } \
+   END { if (a != "" && s != "") printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s", a, s }' \
+  $(VARFILE) 2>/dev/null))
+
 ifeq ($(AUTO),1)
   APPROVE := -auto-approve
 endif
@@ -153,8 +167,7 @@ show: workspace
 
 # The empty/not-found guard matters: with no cluster in state the output is
 # blank, and running a blank command silently does nothing instead of saying the
-# cluster isn't there. The command carries --profile itself when aws_profile is
-# set — see modules/aws/outputs.tf.
+# cluster isn't there.
 kubeconfig: workspace
 	@CMD="$$($(TF) output -raw kubeconfig_cmd 2>/dev/null)"; \
 	case "$$CMD" in \
@@ -162,7 +175,7 @@ kubeconfig: workspace
 	    echo "No cluster in state for $(WORKSPACE) — run: make apply $(CLOUD) $(ENV)"; \
 	    exit 1;; \
 	esac; \
-	$$CMD
+	$(AWS_CREDS) $$CMD
 
 # Prove the kubeconfig actually works.
 #
@@ -173,12 +186,22 @@ kubeconfig: workspace
 # One API call here turns that into a named problem.
 connect: kubeconfig
 	@echo "==> Verifying cluster access for $(WORKSPACE)"
-	@if kubectl get nodes >/dev/null 2>&1; then \
-	  echo "    OK — $$(kubectl get nodes --no-headers 2>/dev/null | grep -c ' Ready') node(s) Ready"; \
+	@if $(AWS_CREDS) kubectl get nodes >/dev/null 2>&1; then \
+	  echo "    OK — $$($(AWS_CREDS) kubectl get nodes --no-headers 2>/dev/null | grep -c ' Ready') node(s) Ready"; \
 	else \
 	  echo "    FAILED — kubectl cannot reach the cluster."; echo; \
 	  $(MAKE) --no-print-directory diagnose CLOUD=$(CLOUD) ENV=$(ENV); \
 	  exit 1; \
+	fi
+	@# The check above used the keys make injects. Your shell has no such prefix,
+	@# so re-run it bare — otherwise make reports OK on a kubeconfig that gives
+	@# plain kubectl a 401, which is a false green.
+	@if [ -n "$(AWS_CREDS)" ] && ! kubectl get nodes >/dev/null 2>&1; then \
+	  echo; \
+	  echo "    NOTE — plain 'kubectl' cannot authenticate, only make can."; \
+	  echo "    Keys in $(VARFILE) are never written into the kubeconfig, so"; \
+	  echo "    kubectl re-runs 'aws eks get-token' against ~/.aws/credentials."; \
+	  echo "    For bare kubectl, export the same keys in your shell."; \
 	fi
 
 # Named causes and their fixes, rather than a generic "check your credentials".
@@ -187,7 +210,7 @@ diagnose:
 	echo "  context : $${ctx:-<none set>}"; \
 	if [ "$(CLOUD)" = "aws" ]; then \
 	  want="$$(printf '%s' "$$ctx" | sed -n 's/^arn:aws:eks:[^:]*:\([0-9]*\):.*/\1/p')"; \
-	  have="$$(aws sts get-caller-identity --query Account --output text 2>/dev/null)"; \
+	  have="$$($(AWS_CREDS) aws sts get-caller-identity --query Account --output text 2>/dev/null)"; \
 	  echo "  cluster account : $${want:-<unknown>}"; \
 	  echo "  CLI account     : $${have:-<not authenticated>}"; \
 	  if [ -z "$$have" ]; then \
@@ -222,7 +245,7 @@ deploy-addons: kubeconfig
 	# This layer reads the infra var-file for the cluster's identity and declares
 	# only the few fields it needs, so Terraform warns about the rest. Expected —
 	# -compact-warnings keeps it to one line.
-	@cd kubernetes && terraform apply -compact-warnings -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars" -auto-approve
+	@cd kubernetes && $(AWS_CREDS) terraform apply -compact-warnings -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars" -auto-approve
 
 # Tear the addons out while the cluster API is still reachable. Once the
 # cluster is gone this cannot run at all — the providers authenticate against
@@ -230,7 +253,7 @@ deploy-addons: kubeconfig
 destroy-addons: guard-args
 	cd kubernetes && terraform init
 	@$(call select_workspace,kubernetes)
-	@cd kubernetes && terraform destroy $(APPROVE) -compact-warnings \
+	@cd kubernetes && $(AWS_CREDS) terraform destroy $(APPROVE) -compact-warnings \
 	  -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars"
 
 # The whole environment, in the only order that works.

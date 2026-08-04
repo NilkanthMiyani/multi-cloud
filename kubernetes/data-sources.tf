@@ -44,20 +44,14 @@ locals {
   ))
 
   exec_auth = {
-    # --profile goes first: it is a global CLI option, and prepending keeps it
-    # ahead of the eks subcommand. Omitted entirely when blank, so the default
-    # credential chain still applies.
     aws = {
       command = "aws"
-      args = concat(
-        var.aws_profile != "" ? ["--profile", var.aws_profile] : [],
-        [
-          "--region", var.region,
-          "eks", "get-token",
-          "--cluster-name", local.cfg.cluster_name,
-          "--output", "json",
-        ],
-      )
+      args = [
+        "--region", var.region,
+        "eks", "get-token",
+        "--cluster-name", local.cfg.cluster_name,
+        "--output", "json",
+      ]
     }
     gcp = {
       command = "gke-gcloud-auth-plugin"

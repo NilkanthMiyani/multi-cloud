@@ -4,7 +4,8 @@
 
 k8s_version = "1.36"
 
-aws_profile = "nilkanth-new"
+aws_access_key = ""
+aws_secret_key = ""
 
 region                   = "ap-south-1"
 availability_zones_count = 2

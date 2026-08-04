@@ -5,7 +5,6 @@ module "aws" {
   cluster_name             = local.cfg.cluster_name
   k8s_version              = var.k8s_version
   project                  = local.cfg.project
-  aws_profile              = var.aws_profile
   node_size                = local.cfg.node_size
   tags                     = local.tags
   availability_zones_count = var.availability_zones_count

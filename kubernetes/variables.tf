@@ -25,15 +25,6 @@ variable "region" {
   default     = "us-east-1"
 }
 
-# Applied to both the cluster lookup (providers.tf) and the exec auth the
-# Kubernetes providers run (data-sources.tf), so this layer talks to the same
-# AWS identity the infra layer used.
-variable "aws_profile" {
-  description = "AWS named profile to authenticate with. Blank uses the default credential chain."
-  type        = string
-  default     = ""
-}
-
 variable "gcp_zone" {
   description = "Zone or region of the GKE cluster. GCP only."
   type        = string
