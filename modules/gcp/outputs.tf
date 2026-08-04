@@ -1,7 +1,4 @@
 locals {
-  # var.gcp_zone holds either a zone ("us-central1-a", 3 segments) or a region
-  # ("us-central1", 2). gcloud needs the matching flag; the previous root output
-  # hardcoded --region, which fails for the zonal default.
   gcp_location_flag = length(split("-", google_container_cluster.this.location)) == 3 ? "--zone" : "--region"
 }
 

@@ -53,15 +53,3 @@ resource "aws_eks_addon" "ebs_csi" {
     aws_eks_node_group.this
   ]
 }
-
-# The StorageClass resources that used to live here now sit in
-# kubernetes/aws-storage.tf.
-#
-# They talked to the Kubernetes API from the infra layer, which configures no
-# kubernetes provider — so they targeted whatever kubeconfig happened to be
-# current. Worse, `make apply` writes the kubeconfig AFTER terraform apply
-# returns, so during the apply the context was still the PREVIOUS cluster.
-#
-# This module now touches only the AWS API. Anything that speaks to the cluster
-# belongs in the addon layer, where a provider is configured and the kubeconfig
-# is already pointed at the right cluster.

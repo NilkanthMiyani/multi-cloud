@@ -1,6 +1,3 @@
-# The module builds its own kubeconfig command: it knows its cluster name, and
-# the region comes from the configured provider rather than being threaded in
-# as another variable.
 data "aws_region" "current" {}
 
 output "cluster_name" {

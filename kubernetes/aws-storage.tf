@@ -1,16 +1,6 @@
 # ------------------------------------------------------------------------
 # AWS StorageClasses (EBS CSI)
 # ------------------------------------------------------------------------
-#
-# Only created in an aws-* workspace. These live here rather than in
-# modules/aws because they speak to the Kubernetes API: the infra layer
-# configures no kubernetes provider, so from there they resolved against
-# whatever kubeconfig was current — and `make apply` writes the kubeconfig only
-# after terraform returns, meaning that was the PREVIOUS cluster.
-#
-# The EBS CSI driver itself (IAM role + aws_eks_addon) stays in modules/aws;
-# that is an AWS API call and correctly belongs to the infra layer. This file
-# assumes it is already installed.
 
 locals {
   aws_storage = local.cloud == "aws" ? 1 : 0
