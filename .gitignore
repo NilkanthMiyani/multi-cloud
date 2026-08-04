@@ -1,0 +1,14 @@
+# Local state (one workspace per cloud, one state file each)
+terraform.tfstate.d/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform working directory
+.terraform/
+.terraform.lock.hcl
+
+# Crash / plan artifacts
+crash.log
+crash.*.log
+*.tfplan

@@ -1,0 +1,34 @@
+locals {
+  # var.gcp_zone holds either a zone ("us-central1-a", 3 segments) or a region
+  # ("us-central1", 2). gcloud needs the matching flag; the previous root output
+  # hardcoded --region, which fails for the zonal default.
+  gcp_location_flag = length(split("-", google_container_cluster.this.location)) == 3 ? "--zone" : "--region"
+}
+
+output "cluster_name" {
+  description = "Name of the provisioned GKE cluster."
+  value       = google_container_cluster.this.name
+}
+
+output "cluster_endpoint" {
+  description = "API server endpoint of the GKE cluster."
+  value       = google_container_cluster.this.endpoint
+}
+
+output "cluster_ca_certificate" {
+  description = "Base64-encoded CA certificate for the cluster API server."
+  value       = google_container_cluster.this.master_auth[0].cluster_ca_certificate
+  sensitive   = true
+}
+
+output "kubeconfig_cmd" {
+  description = "Command to point kubectl at this cluster."
+  value = join(" ", [
+    "gcloud container clusters get-credentials",
+    google_container_cluster.this.name,
+    local.gcp_location_flag,
+    google_container_cluster.this.location,
+    "--project",
+    google_container_cluster.this.project,
+  ])
+}
