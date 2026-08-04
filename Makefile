@@ -215,7 +215,7 @@ diagnose:
 	  echo "  CLI account     : $${have:-<not authenticated>}"; \
 	  if [ -z "$$have" ]; then \
 	    echo; echo "  The aws CLI has no working credentials."; \
-	    echo "  Fix: set aws_profile (or aws_access_key/aws_secret_key) in $(VARFILE)."; \
+	    echo "  Fix: set aws_access_key/aws_secret_key in $(VARFILE), or run aws configure."; \
 	  elif [ -z "$$want" ]; then \
 	    echo; echo "  WRONG CONTEXT — the current context is not an EKS cluster, so kubectl"; \
 	    echo "  is pointed at a different cluster entirely (possibly another cloud)."; \
@@ -223,8 +223,8 @@ diagnose:
 	  elif [ "$$want" != "$$have" ]; then \
 	    echo; echo "  ACCOUNT MISMATCH — the cluster lives in $$want, the CLI authenticates as $$have."; \
 	    echo "  get-token still mints a valid token, so EKS returns 401 rather than 'not found'."; \
-	    echo "  Fix: point aws_profile in $(VARFILE) at a profile for account $$want,"; \
-	    echo "       then re-run: make connect $(CLOUD) $(ENV)"; \
+	    echo "  Fix: set aws_access_key/aws_secret_key in $(VARFILE) to keys for"; \
+	    echo "       account $$want, then re-run: make connect $(CLOUD) $(ENV)"; \
 	  else \
 	    echo; echo "  Credentials match, so this is authorization, not authentication:"; \
 	    echo "  the IAM principal is not in the cluster's access entries."; \
