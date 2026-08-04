@@ -75,7 +75,10 @@ make destroy aws dev
 | `make plan <cloud> <env>` | show the plan |
 | `make apply <cloud> <env>` | build the cluster, then update kubeconfig |
 | `make deploy-addons <cloud> <env>` | deploy the databases enabled in `kubernetes/envs/` |
+| `make connect <cloud> <env>` | write the kubeconfig **and prove it works** |
 | `make destroy <cloud> <env>` | tear the cluster down |
+| `make destroy-addons <cloud> <env>` | remove the addons, keep the cluster |
+| `make destroy-all <cloud> <env>` | addons then cluster, in the required order |
 | `make output` / `show` / `kubeconfig` | outputs, state, kubeconfig command |
 | `make fmt` / `validate` / `upgrade` | format, validate, re-init with `-upgrade` |
 
@@ -89,6 +92,29 @@ make deploy-addons aws dev     # 2. databases
 ```
 
 Step 2 is a no-op until you turn something on.
+
+`make apply` finishes by running `make connect`, which writes the kubeconfig and
+then actually calls the cluster. This matters because `aws eks update-kubeconfig`
+(and the gcloud/az/doctl equivalents) only *write a file* — they never contact
+the cluster, so they report success even when the context that results cannot
+authenticate. Without the check the failure surfaces much later, during
+`deploy-addons`, as an opaque `Unauthorized`.
+
+If it fails, `make diagnose <cloud> <env>` names the cause:
+
+```
+  context         : arn:aws:eks:ap-south-1:310318659882:cluster/prod-aws
+  cluster account : 310318659882
+  CLI account     : 216731772708
+
+  ACCOUNT MISMATCH — the cluster lives in 310318659882, the CLI authenticates as 216731772708.
+  get-token still mints a valid token, so EKS returns 401 rather than 'not found'.
+  Fix: make connect aws prod AWS_PROFILE=<profile for account 310318659882>
+```
+
+It distinguishes four cases: no credentials, wrong AWS account, a context
+pointing at a different cluster entirely, and credentials that are correct but
+whose IAM principal is missing from the cluster's access entries.
 
 ## Enabling a database
 
@@ -188,17 +214,29 @@ kubectl port-forward -n rabbitmq   svc/rabbitmq   15672:15672   # management UI
 
 ## Teardown
 
-**Addons first.** The addon state points at in-cluster objects; if the cluster goes first, Terraform can't reach the API server to clean up.
-
 ```bash
-cd kubernetes
-terraform workspace select aws-dev
-terraform destroy -var-file=../envs/aws.tfvars -var-file=envs/aws.tfvars
-cd ..
-make destroy aws dev
+make destroy-all aws dev       # addons, then the cluster
 ```
 
-If the cluster is already gone, drop the stale state instead: `rm -rf kubernetes/terraform.tfstate.d/<cloud>-<env>/`.
+**Order matters, which is why this is one target.** The addon layer's providers
+authenticate against the live cluster API, so once the cluster is gone Terraform
+cannot reach the addons to clean them up — and the state has to be deleted by
+hand. Run the two halves separately with `make destroy-addons` / `make destroy`
+if you want to keep the cluster.
+
+If the cluster is already gone, drop the stale addon state instead:
+`rm -rf kubernetes/terraform.tfstate.d/<cloud>-<env>/`.
+
+Two things that can stall it:
+
+- **A namespace stuck `Terminating`** means a finalizer is waiting on an
+  operator that is already deleted. `kubectl get ns <ns> -o jsonpath='{.status.conditions}'`
+  names what is blocking; the usual culprits are custom resources whose operator
+  went first, and orphaned cluster-scoped webhooks that reject the patch used to
+  clear them.
+- **On AWS, EBS volumes survive.** `standard-sc` sets `reclaim_policy = Retain`
+  deliberately, so PVs outlive the cluster and keep billing. `destroy-all`
+  prints the command to list them.
 
 ## Layout
 
