@@ -5,7 +5,7 @@
 locals {
   redis_resources = var.redis.resources != null ? { resources = var.redis.resources } : {}
 
-  redis_create_secret = var.enabled.redis && var.redis.existing_secret == null
+  redis_create_secret = local.enabled.redis && var.redis.existing_secret == null
 
   redis_secret_name = (
     var.redis.existing_secret != null
@@ -29,7 +29,7 @@ locals {
 }
 
 resource "kubernetes_namespace" "redis" {
-  count = var.enabled.redis ? 1 : 0
+  count = local.enabled.redis ? 1 : 0
   metadata {
     name = var.redis.namespace
   }
@@ -53,7 +53,7 @@ resource "kubernetes_secret" "redis_auth" {
 }
 
 resource "helm_release" "redis" {
-  count            = var.enabled.redis ? 1 : 0
+  count            = local.enabled.redis ? 1 : 0
   name             = "redis"
   repository       = "oci://registry-1.docker.io/bitnamicharts"
   chart            = "redis"

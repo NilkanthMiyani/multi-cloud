@@ -19,6 +19,22 @@ locals {
   # as local.env for any env-specific logic (naming, tags, etc.).
   env = local.parts[1]
 
+  # The settings for THIS environment, picked out of the map that
+  # envs/<cloud>.tfvars declares for all three. A workspace whose env half has
+  # no entry fails here rather than applying half-configured.
+  cfg = var.envs[local.env]
+
+  # Project and Env are derived, not typed into every tfvars, so they cannot
+  # claim one environment while sitting in another's file. GCP labels must be
+  # lowercase in both key and value; the other three take TitleCase keys.
+  # var.tags merges on top for anything extra (CostCenter, Owner, ...).
+  tags = merge(
+    local.cloud == "gcp"
+    ? { project = lower(local.cfg.project), env = local.env }
+    : { Project = local.cfg.project, Env = local.env },
+    var.tags,
+  )
+
   # Cloud selection flags. Each resource file gates its resources on the
   # matching flag via count, so only the selected cloud's resources are created.
   is_aws   = local.cloud == "aws" ? 1 : 0

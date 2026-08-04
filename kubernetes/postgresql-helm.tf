@@ -5,7 +5,7 @@
 locals {
   postgresql_resources = var.postgresql.resources != null ? { resources = var.postgresql.resources } : {}
 
-  postgresql_create_secret = var.enabled.postgresql && var.postgresql.existing_secret == null
+  postgresql_create_secret = local.enabled.postgresql && var.postgresql.existing_secret == null
 
   postgresql_secret_name = (
     var.postgresql.existing_secret != null
@@ -17,7 +17,7 @@ locals {
 }
 
 resource "kubernetes_namespace" "postgresql" {
-  count = var.enabled.postgresql ? 1 : 0
+  count = local.enabled.postgresql ? 1 : 0
   metadata {
     name = var.postgresql.namespace
   }
@@ -48,7 +48,7 @@ resource "kubernetes_secret" "postgresql_auth" {
 }
 
 resource "helm_release" "postgresql" {
-  count            = var.enabled.postgresql ? 1 : 0
+  count            = local.enabled.postgresql ? 1 : 0
   name             = "postgresql"
   repository       = "https://charts.bitnami.com/bitnami"
   chart            = "postgresql"

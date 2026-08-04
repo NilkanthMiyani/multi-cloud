@@ -3,9 +3,11 @@ output "cluster_name" {
   value       = azurerm_kubernetes_cluster.this.name
 }
 
+# AKS returns a bare FQDN, so the scheme is added here — every module emits a
+# full URL for the providers' `host` argument.
 output "cluster_endpoint" {
-  description = "API server FQDN of the AKS cluster."
-  value       = azurerm_kubernetes_cluster.this.fqdn
+  description = "API server endpoint of the AKS cluster."
+  value       = "https://${azurerm_kubernetes_cluster.this.fqdn}"
 }
 
 # Needed by the root kubeconfig_cmd — `az aks get-credentials` takes the

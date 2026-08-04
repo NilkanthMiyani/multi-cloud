@@ -9,14 +9,14 @@ locals {
 }
 
 resource "kubernetes_namespace" "elasticsearch" {
-  count = var.enabled.elasticsearch ? 1 : 0
+  count = local.enabled.elasticsearch ? 1 : 0
   metadata {
     name = var.elasticsearch.namespace
   }
 }
 
 resource "helm_release" "elasticsearch" {
-  count            = var.enabled.elasticsearch ? 1 : 0
+  count            = local.enabled.elasticsearch ? 1 : 0
   name             = "elasticsearch"
   repository       = "https://helm.elastic.co"
   chart            = "elasticsearch"

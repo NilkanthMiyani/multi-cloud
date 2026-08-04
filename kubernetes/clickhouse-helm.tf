@@ -8,7 +8,7 @@ locals {
     var.clickhouse.resources != null ? { resourcesPreset = "none" } : {},
   )
 
-  clickhouse_create_secret = var.enabled.clickhouse && var.clickhouse.existing_secret == null
+  clickhouse_create_secret = local.enabled.clickhouse && var.clickhouse.existing_secret == null
 
   clickhouse_secret_name = (
     var.clickhouse.existing_secret != null
@@ -20,7 +20,7 @@ locals {
 }
 
 resource "kubernetes_namespace" "clickhouse" {
-  count = var.enabled.clickhouse ? 1 : 0
+  count = local.enabled.clickhouse ? 1 : 0
   metadata {
     name = var.clickhouse.namespace
   }
@@ -44,7 +44,7 @@ resource "kubernetes_secret" "clickhouse_auth" {
 }
 
 resource "helm_release" "clickhouse" {
-  count            = var.enabled.clickhouse ? 1 : 0
+  count            = local.enabled.clickhouse ? 1 : 0
   name             = "clickhouse"
   repository       = "oci://registry-1.docker.io/bitnamicharts"
   chart            = "clickhouse"

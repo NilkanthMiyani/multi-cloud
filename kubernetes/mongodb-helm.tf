@@ -5,7 +5,7 @@
 locals {
   mongodb_resources = var.mongodb.resources != null ? { resources = var.mongodb.resources } : {}
 
-  mongodb_create_secret = var.enabled.mongodb && var.mongodb.existing_secret == null
+  mongodb_create_secret = local.enabled.mongodb && var.mongodb.existing_secret == null
 
   mongodb_secret_name = (
     var.mongodb.existing_secret != null
@@ -17,14 +17,14 @@ locals {
 }
 
 resource "kubernetes_namespace" "mongodb" {
-  count = var.enabled.mongodb ? 1 : 0
+  count = local.enabled.mongodb ? 1 : 0
   metadata {
     name = var.mongodb.namespace
   }
 }
 
 resource "helm_release" "mongodb_operator" {
-  count            = var.enabled.mongodb ? 1 : 0
+  count            = local.enabled.mongodb ? 1 : 0
   name             = "community-operator"
   repository       = "https://mongodb.github.io/helm-charts"
   chart            = "community-operator"
@@ -55,7 +55,7 @@ resource "kubernetes_secret" "mongodb_auth" {
 }
 
 resource "kubectl_manifest" "mongodb_cluster" {
-  count = var.enabled.mongodb ? 1 : 0
+  count = local.enabled.mongodb ? 1 : 0
   yaml_body = yamlencode({
     "apiVersion" = "mongodbcommunity.mongodb.com/v1"
     "kind"       = "MongoDBCommunity"

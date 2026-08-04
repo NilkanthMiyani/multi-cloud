@@ -5,7 +5,7 @@
 locals {
   rabbitmq_resources = var.rabbitmq.resources != null ? { resources = var.rabbitmq.resources } : {}
 
-  rabbitmq_create_secret = var.enabled.rabbitmq && var.rabbitmq.existing_secret == null
+  rabbitmq_create_secret = local.enabled.rabbitmq && var.rabbitmq.existing_secret == null
 
   rabbitmq_secret_name = (
     var.rabbitmq.existing_secret != null
@@ -17,7 +17,7 @@ locals {
 }
 
 resource "kubernetes_namespace" "rabbitmq" {
-  count = var.enabled.rabbitmq ? 1 : 0
+  count = local.enabled.rabbitmq ? 1 : 0
   metadata {
     name = var.rabbitmq.namespace
   }
@@ -50,7 +50,7 @@ resource "kubernetes_secret" "rabbitmq_auth" {
 }
 
 resource "helm_release" "rabbitmq" {
-  count            = var.enabled.rabbitmq ? 1 : 0
+  count            = local.enabled.rabbitmq ? 1 : 0
   name             = "rabbitmq"
   repository       = "oci://registry-1.docker.io/bitnamicharts"
   chart            = "rabbitmq"

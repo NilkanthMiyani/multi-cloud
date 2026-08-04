@@ -5,7 +5,7 @@
 locals {
   typesense_resources = var.typesense.resources != null ? { resources = var.typesense.resources } : {}
 
-  typesense_create_secret = var.enabled.typesense && var.typesense.existing_secret == null
+  typesense_create_secret = local.enabled.typesense && var.typesense.existing_secret == null
 
   typesense_secret_name = (
     var.typesense.existing_secret != null
@@ -17,7 +17,7 @@ locals {
 }
 
 resource "kubernetes_namespace" "typesense" {
-  count = var.enabled.typesense ? 1 : 0
+  count = local.enabled.typesense ? 1 : 0
   metadata {
     name = var.typesense.namespace
 
@@ -33,7 +33,7 @@ resource "kubernetes_namespace" "typesense" {
 }
 
 resource "helm_release" "typesense_operator" {
-  count            = var.enabled.typesense ? 1 : 0
+  count            = local.enabled.typesense ? 1 : 0
   name             = "typesense-operator"
   repository       = "https://sai3010.github.io/Typesense-Kubernetes-Operator-Charts/"
   chart            = "typesense-kubernetes-operator"
@@ -69,7 +69,7 @@ resource "kubernetes_secret" "typesense_auth" {
 }
 
 resource "kubectl_manifest" "typesense_cluster" {
-  count = var.enabled.typesense ? 1 : 0
+  count = local.enabled.typesense ? 1 : 0
   yaml_body = yamlencode({
     "apiVersion" = "typesenseproject.org/v1"
     "kind"       = "TypesenseOperator"

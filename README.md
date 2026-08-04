@@ -7,25 +7,50 @@ Two layers:
 | layer | path | builds |
 |---|---|---|
 | infra | `.` | VPC, cluster, node pool, IAM |
-| addons | `kubernetes/` | Redis, RabbitMQ, Elasticsearch, Cassandra, MongoDB, PostgreSQL, ClickHouse, MySQL, Meilisearch, Typesense |
+| addons | `kubernetes/` | Redis, RabbitMQ, Elasticsearch, Cassandra, MongoDB, PostgreSQL, ClickHouse, MySQL, Meilisearch, Typesense, AWS Load Balancer Controller |
 
-The Terraform workspace name is `<cloud>-<env>` and selects both. Each combination gets its own state and reads `envs/<cloud>-<env>.tfvars`.
+A few addons span both layers: the AWS Load Balancer Controller's IAM role is
+created by the infra layer and its ServiceAccount + Helm release by the addon
+layer, which finds the role by name. Same split as the AWS StorageClass —
+anything that calls a cloud API lives in `.`, anything that calls the Kubernetes
+API lives in `kubernetes/`.
+
+The Terraform workspace name is `<cloud>-<env>` and selects both. Each combination gets its own state. Inputs come from `envs/<cloud>.tfvars`, which carries all three environments under an `envs` map — the env half of the workspace name picks one.
 
 ```
 cloud = aws | az | gcp | do          env = dev | stage | prod
 ```
+
+Anything identical across the three environments sits at the top of the file;
+anything that differs goes under `envs`:
+
+```hcl
+region      = "us-east-1"            # shared by dev, stage and prod
+k8s_version = "1.36"
+
+envs = {
+  dev   = { cluster_name = "dev-aws",   project = "dev-proj",   node_size = "t3.small"  }
+  stage = { cluster_name = "stage-aws", project = "stage-proj", node_size = "t3.medium" }
+  prod  = { cluster_name = "prod-aws",  project = "prod-proj",  node_size = "t3.medium" }
+}
+```
+
+`Project` and `Env` tags are derived from `project` and the workspace, so there
+is no tag block to keep in sync. `var.tags` merges extras on top if you need
+them (GCP gets lowercase `project`/`env` labels, as GKE requires).
 
 ## Prerequisites
 
 - Terraform >= 1.5, `kubectl`, `helm`
 - CLI + credentials for the cloud you are targeting
 
-| cloud | auth |
-|---|---|
-| AWS | `aws configure` (or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) |
-| Azure | `az login` + `export ARM_SUBSCRIPTION_ID=<id>` |
-| GCP | `gcloud auth application-default login`, set `gcp_project` in tfvars |
-| DigitalOcean | `export DIGITALOCEAN_TOKEN=<token>` |
+| cloud | auth | also needed for addons |
+|---|---|---|
+| AWS | `aws configure` (or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) | `aws` CLI |
+| Azure | `az login` + `export ARM_SUBSCRIPTION_ID=<id>` | `kubelogin` (`az aks install-cli`) |
+| GCP | `gcloud auth application-default login`, set `gcp_project` in tfvars | `gke-gcloud-auth-plugin` (`gcloud components install gke-gcloud-auth-plugin`) |
+| DigitalOcean | `export DIGITALOCEAN_TOKEN=<token>` | `doctl` (`doctl auth init`) |
+
 
 ## Usage
 
@@ -67,28 +92,34 @@ Step 2 is a no-op until you turn something on.
 
 ## Enabling a database
 
-Edit `kubernetes/envs/<cloud>-<env>.tfvars`. The toggle block at the top is the only thing you normally touch:
+Edit `kubernetes/envs/<cloud>.tfvars`. The toggle block at the top is the only thing you normally touch, and it is keyed by environment:
 
 ```hcl
 enabled = {
-  redis      = true
-  postgresql = true
-  mysql      = false
-  # ...
+  dev = {
+    redis      = true
+    postgresql = true
+    mysql      = false
+    # ...
+  }
+  stage = { ... }
+  prod  = { ... }
 }
 ```
 
 Then `make deploy-addons <cloud> <env>`.
 
-Sizing lives below the toggles and is **identical across dev/stage/prod** — only `storage_class` differs per cloud (`gp2`, `standard-rwo`, `default`, `do-block-storage`). Defaults for everything else are in `kubernetes/variables.tf`; a tfvars entry only lists what it changes:
+Sizing lives below the toggles. It is **identical across dev/stage/prod**, so unlike the toggles it is declared once and not env-keyed — only `storage_class` differs per cloud (`standard-sc`, `standard-rwo`, `default`, `do-block-storage`). Defaults for everything else are in `kubernetes/variables.tf`; a tfvars entry only lists what it changes:
 
 ```hcl
 redis = {
   architecture  = "standalone"
   storage_size  = "8Gi"
-  storage_class = "gp2"
+  storage_class = "standard-sc"
 }
 ```
+
+On AWS, `standard-sc` is created by the addon layer itself ([`aws-helm.tf`](kubernetes/aws-helm.tf)) — gp2-backed but with `Retain`, `WaitForFirstConsumer` and volume expansion, and it demotes EKS's stock `gp2` from default at the same time. The other three clouds use their built-in default class.
 
 ## Credentials
 
@@ -162,7 +193,7 @@ kubectl port-forward -n rabbitmq   svc/rabbitmq   15672:15672   # management UI
 ```bash
 cd kubernetes
 terraform workspace select aws-dev
-terraform destroy -var-file=envs/aws-dev.tfvars
+terraform destroy -var-file=../envs/aws.tfvars -var-file=envs/aws.tfvars
 cd ..
 make destroy aws dev
 ```
@@ -173,16 +204,11 @@ If the cluster is already gone, drop the stale state instead: `rm -rf kubernetes
 
 ```
 ├── main.tf providers.tf variables.tf outputs.tf locals.tf
-├── envs/<cloud>-<env>.tfvars          cluster size, region, CIDRs
+├── envs/<cloud>.tfvars                dev+stage+prod: sizes, region, CIDRs
 ├── modules/{aws,azure,gcp,do}/        one per cloud
 └── kubernetes/
     ├── variables.tf locals.tf providers.tf
     ├── <service>-helm.tf              one per database
-    └── envs/<cloud>-<env>.tfvars      toggles + sizing
+    └── envs/<cloud>.tfvars            per-env toggles + shared sizing
 ```
 
-## Known gaps
-
-- **State is local.** `terraform.tfstate.d/` is gitignored, so there is no locking or sharing, and generated passwords sit in plaintext state. Move to a remote backend before real use.
-- **No `destroy-addons` target** — use the manual sequence above.
-- **Bitnami charts** pin `bitnamilegacy/*` images because the public catalog moved behind a paid tier. Mirror them into your own registry and set `image_registry` / `image_repository`.

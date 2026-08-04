@@ -1,6 +1,37 @@
-variable "cluster_name" {
-  description = "Name of the managed Kubernetes cluster."
-  type        = string
+# --- Per-environment settings ----------------------------------------------
+# The workspace is "<cloud>-<env>"; locals.tf splits it and indexes this map
+# with the env half. That is what lets envs/<cloud>.tfvars carry dev, stage and
+# prod together — "make plan aws dev" selects the "dev" key.
+#
+# The object is a union across the four clouds: AWS scales its node group with
+# min/desired/max, the others use node_count, DO has its own size slug. Every
+# field below is optional and defaults to what the flat variable it replaced
+# defaulted to, so a cloud omits whatever it does not use.
+
+variable "envs" {
+  description = "Per-environment settings, keyed by env name (dev | stage | prod)."
+  type = map(object({
+    cluster_name = string
+    project      = string
+
+    node_size    = optional(string, "t3.medium")   # aws | az | gcp
+    do_node_size = optional(string, "s-2vcpu-4gb") # do
+    node_count   = optional(number, 2)             # az | gcp | do
+
+    node_disk_size = optional(number, 50) # aws | az
+
+    # EKS managed node group scaling (aws only).
+    node_min_size     = optional(number, 3)
+    node_desired_size = optional(number, 5)
+    node_max_size     = optional(number, 5)
+
+    vpc_cidr = optional(string, "10.1.0.0/16") # aws
+  }))
+
+  validation {
+    condition     = alltrue([for e in keys(var.envs) : contains(["dev", "stage", "prod"], e)])
+    error_message = "envs keys must be one of: dev, stage, prod."
+  }
 }
 
 variable "k8s_version" {
@@ -10,36 +41,19 @@ variable "k8s_version" {
 
 # --- Generic (shared across all clouds) ------------------------------------
 
-variable "project" {
-  description = "Name to be used on all the resources as identifier. e.g. Project name, Application name"
-  type        = string
-  default     = "prod-prod"
-}
-
 variable "region" {
   description = "AWS region (e.g. us-east-1). Azure uses var.location; GCP uses var.gcp_region."
   type        = string
   default     = "us-east-1"
 }
 
-variable "node_size" {
-  description = "Machine type for the default node pool. Cloud-specific: AWS t3.medium, Azure Standard_D2s_v3, GCP e2-standard-2."
-  type        = string
-  default     = "t3.medium"
-}
-
-variable "node_count" {
-  description = "Number of nodes in the default node pool."
-  type        = number
-  default     = 2
-}
-
+# Project and Env are derived from the workspace in locals.tf and applied to
+# every resource, so they can never drift out of sync with the environment they
+# claim to describe. This variable is for anything extra, and merges on top.
 variable "tags" {
-  description = "A map of tags to add to all resources. GCP labels must be lowercase, so the gcp workspace's tfvars uses lowercase keys/values."
+  description = "Extra tags merged over the derived Project/Env tags. Usually empty."
   type        = map(string)
-  default = {
-    "project" = "prod-prod"
-  }
+  default     = {}
 }
 
 # --- AWS / EKS -------------------------------------------------------------
@@ -65,12 +79,6 @@ variable "availability_zones_count" {
   default     = 2
 }
 
-variable "vpc_cidr" {
-  description = "The CIDR block for the VPC. Default value is a valid CIDR, but not acceptable by AWS and should be overridden"
-  type        = string
-  default     = "10.1.0.0/16"
-}
-
 variable "subnet_cidr_bits" {
   description = "The number of subnet bits for the CIDR. For example, specifying a value 8 for this parameter will create a CIDR with a mask of /24."
   type        = number
@@ -87,30 +95,6 @@ variable "node_ami_type" {
   description = "AMI type for the EKS managed node group (e.g. AL2023_x86_64_STANDARD)."
   type        = string
   default     = "AL2023_x86_64_STANDARD"
-}
-
-variable "node_disk_size" {
-  description = "OS/disk size (GiB) for each worker node (EKS disk_size / AKS os_disk_size_gb)."
-  type        = number
-  default     = 50
-}
-
-variable "node_min_size" {
-  description = "Minimum number of nodes in the EKS node group."
-  type        = number
-  default     = 3
-}
-
-variable "node_desired_size" {
-  description = "Desired number of nodes in the EKS node group."
-  type        = number
-  default     = 5
-}
-
-variable "node_max_size" {
-  description = "Maximum number of nodes in the EKS node group."
-  type        = number
-  default     = 5
 }
 
 # --- Azure / AKS -----------------------------------------------------------
@@ -194,12 +178,6 @@ variable "do_k8s_version" {
   description = "DOKS Kubernetes version slug (DigitalOcean-specific, e.g. 1.36.0-do.3). List valid values with `doctl kubernetes options versions`."
   type        = string
   default     = "1.36.0-do.3"
-}
-
-variable "do_node_size" {
-  description = "Droplet size slug for the default node pool (e.g. s-2vcpu-4gb)."
-  type        = string
-  default     = "s-2vcpu-4gb"
 }
 
 variable "do_vpc_cidr" {

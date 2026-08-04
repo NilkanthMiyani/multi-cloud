@@ -5,7 +5,7 @@
 locals {
   mysql_resources = var.mysql.resources != null ? { resources = var.mysql.resources } : {}
 
-  mysql_create_secret = var.enabled.mysql && var.mysql.existing_secret == null
+  mysql_create_secret = local.enabled.mysql && var.mysql.existing_secret == null
 
   mysql_secret_name = (
     var.mysql.existing_secret != null
@@ -17,7 +17,7 @@ locals {
 }
 
 resource "kubernetes_namespace" "mysql" {
-  count = var.enabled.mysql ? 1 : 0
+  count = local.enabled.mysql ? 1 : 0
   metadata {
     name = var.mysql.namespace
   }
@@ -57,7 +57,7 @@ resource "kubernetes_secret" "mysql_auth" {
 }
 
 resource "helm_release" "mysql" {
-  count            = var.enabled.mysql ? 1 : 0
+  count            = local.enabled.mysql ? 1 : 0
   name             = "mysql"
   repository       = "oci://registry-1.docker.io/bitnamicharts"
   chart            = "mysql"

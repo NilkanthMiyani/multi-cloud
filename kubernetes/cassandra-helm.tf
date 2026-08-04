@@ -56,7 +56,7 @@ locals {
 }
 
 resource "helm_release" "cert_manager" {
-  count            = var.enabled.cassandra ? 1 : 0
+  count            = local.enabled.cassandra ? 1 : 0
   name             = "cert-manager"
   repository       = "https://charts.jetstack.io"
   chart            = "cert-manager"
@@ -71,7 +71,7 @@ resource "helm_release" "cert_manager" {
 }
 
 resource "helm_release" "k8ssandra_operator" {
-  count            = var.enabled.cassandra ? 1 : 0
+  count            = local.enabled.cassandra ? 1 : 0
   name             = "k8ssandra-operator"
   repository       = "https://helm.k8ssandra.io/stable"
   chart            = "k8ssandra-operator"
@@ -83,7 +83,7 @@ resource "helm_release" "k8ssandra_operator" {
 }
 
 resource "kubectl_manifest" "cassandra_cluster" {
-  count = var.enabled.cassandra ? 1 : 0
+  count = local.enabled.cassandra ? 1 : 0
   yaml_body = yamlencode({
     "apiVersion" = "k8ssandra.io/v1alpha1"
     "kind"       = "K8ssandraCluster"

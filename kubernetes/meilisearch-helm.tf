@@ -5,7 +5,7 @@
 locals {
   meilisearch_resources = var.meilisearch.resources != null ? { resources = var.meilisearch.resources } : {}
 
-  meilisearch_create_secret = var.enabled.meilisearch && var.meilisearch.existing_secret == null
+  meilisearch_create_secret = local.enabled.meilisearch && var.meilisearch.existing_secret == null
 
   meilisearch_secret_name = (
     var.meilisearch.existing_secret != null
@@ -17,7 +17,7 @@ locals {
 }
 
 resource "kubernetes_namespace" "meilisearch" {
-  count = var.enabled.meilisearch ? 1 : 0
+  count = local.enabled.meilisearch ? 1 : 0
   metadata {
     name = var.meilisearch.namespace
   }
@@ -41,7 +41,7 @@ resource "kubernetes_secret" "meilisearch_auth" {
 }
 
 resource "helm_release" "meilisearch" {
-  count            = var.enabled.meilisearch ? 1 : 0
+  count            = local.enabled.meilisearch ? 1 : 0
   name             = "meilisearch"
   repository       = "https://meilisearch.github.io/meilisearch-kubernetes"
   chart            = "meilisearch"

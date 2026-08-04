@@ -5,13 +5,21 @@ locals {
   # Environment tier (dev | stage | prod), for anything that varies by env.
   env = split("-", terraform.workspace)[1]
 
+  # Cluster identity for THIS environment, out of the infra layer's
+  # ../envs/<cloud>.tfvars, which carries all three.
+  cfg = var.envs[local.env]
+
+  # Service switches for THIS environment. Everything else about a service is
+  # sized identically across environments, so only the toggles are env-keyed.
+  enabled = var.enabled[local.env]
+
   # Default StorageClass per cloud. Every addon resolves its class as
   # coalesce(var.<svc>.storage_class, local.storage_class), so a service only
   # names a class when it needs a non-default one. This is what lets the addon
   # layer run anywhere — the previous hardcoded "gp2" left every PVC Pending
   # on GKE, AKS and DOKS.
   #
-  #   aws -> standard-sc      created by aws-storage.tf in this layer, backed by
+  #   aws -> standard-sc      created by aws-helm.tf in this layer, backed by
   #                           gp2 but with Retain + WaitForFirstConsumer +
   #                           volume expansion. EKS's stock gp2 is demoted from
   #                           default at the same time. Because this class is

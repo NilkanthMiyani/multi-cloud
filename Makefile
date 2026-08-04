@@ -3,7 +3,8 @@
 # The Terraform workspace name is "<cloud>-<env>" (e.g. aws-dev, gcp-stage,
 # az-prod). That single name selects BOTH the cloud and the environment, and
 # gives each combination its own state file (terraform.tfstate.d/<cloud>-<env>/).
-# Each combination reads its inputs from envs/<cloud>-<env>.tfvars. These
+# Inputs come from envs/<cloud>.tfvars, which holds dev, stage and prod together
+# under an "envs" map; the env half of the workspace name picks one. These
 # targets keep the workspace and the -var-file lined up for you.
 #
 # Usage — give the verb, then the cloud and env as plain words:
@@ -33,8 +34,10 @@ CLOUDN  = $(words $(filter $(CLOUDS),$(MAKECMDGOALS)))
 ENVN    = $(words $(filter $(ENVS),$(MAKECMDGOALS)))
 VERBN   = $(words $(filter $(VERBS),$(MAKECMDGOALS)))
 
+# One var-file per cloud, carrying all three environments; the workspace's env
+# half selects which one applies. See variables.tf ("envs").
 WORKSPACE = $(CLOUD)-$(ENV)
-VARFILE   = envs/$(CLOUD)-$(ENV).tfvars
+VARFILE   = envs/$(CLOUD).tfvars
 ifeq ($(AUTO),1)
   APPROVE := -auto-approve
 endif
@@ -106,13 +109,21 @@ guard-args:
 # yet" and quietly create an empty-state workspace, which on apply means
 # recreating infrastructure that already exists. Here a select failure stays a
 # failure, and creation is deliberate and announced.
+#
+# Takes the layer directory, because both layers need this: the addon layer
+# shares the workspace name and would otherwise reinstall addons into a cluster
+# that already has them.
+define select_workspace
+cd $(1) && if $(TF) workspace list | sed 's/^[* ]*//' | grep -qx '$(WORKSPACE)'; then \
+  $(TF) workspace select $(WORKSPACE); \
+else \
+  echo "==> Creating workspace $(WORKSPACE) in $(1)/ (new, empty state)"; \
+  $(TF) workspace new $(WORKSPACE); \
+fi
+endef
+
 workspace: guard-args $(STAMP)
-	@if $(TF) workspace list | sed 's/^[* ]*//' | grep -qx '$(WORKSPACE)'; then \
-	  $(TF) workspace select $(WORKSPACE); \
-	else \
-	  echo "==> Creating workspace $(WORKSPACE) (new, empty state)"; \
-	  $(TF) workspace new $(WORKSPACE); \
-	fi
+	@$(call select_workspace,.)
 
 # --- verbs -----------------------------------------------------------------
 
@@ -144,7 +155,10 @@ kubeconfig: workspace
 deploy-addons: kubeconfig
 	@echo "Deploying addons via Terraform for $(WORKSPACE)..."
 	cd kubernetes && terraform init
-	cd kubernetes && terraform workspace select $(WORKSPACE) || terraform workspace new $(WORKSPACE)
-	cd kubernetes && terraform apply -var-file="envs/$(WORKSPACE).tfvars" -auto-approve
+	@$(call select_workspace,kubernetes)
+	# This layer reads the infra var-file for the cluster's identity and declares
+	# only the few fields it needs, so Terraform warns about the rest. Expected —
+	# -compact-warnings keeps it to one line.
+	cd kubernetes && terraform apply -compact-warnings -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars" -auto-approve
 
 

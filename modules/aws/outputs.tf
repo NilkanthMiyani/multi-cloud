@@ -5,9 +5,23 @@ output "cluster_name" {
   value       = aws_eks_cluster.this.name
 }
 
+# EKS already returns "https://…", so no scheme fix-up is needed here.
 output "cluster_endpoint" {
   description = "API server endpoint of the EKS cluster."
   value       = aws_eks_cluster.this.endpoint
+}
+
+# The addon layer looks these up by name rather than consuming the outputs, so
+# it stays decoupled from infra state. Exposed for `terraform output` and for
+# anything that does want to wire them directly.
+output "lb_controller_role_arn" {
+  description = "IAM role ARN for the AWS Load Balancer Controller service account."
+  value       = module.lb_role.iam_role_arn
+}
+
+output "ebs_csi_role_arn" {
+  description = "IAM role ARN used by the EBS CSI driver addon."
+  value       = module.ebs_csi_irsa_role.iam_role_arn
 }
 
 output "cluster_ca_certificate" {

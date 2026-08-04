@@ -7,9 +7,12 @@ output "cluster_name" {
   value       = google_container_cluster.this.name
 }
 
+# GKE returns a bare IP (e.g. "34.170.28.68"), so the scheme is added here.
+# Every module emits a full URL, which is what the kubernetes/helm providers'
+# `host` argument requires.
 output "cluster_endpoint" {
   description = "API server endpoint of the GKE cluster."
-  value       = google_container_cluster.this.endpoint
+  value       = "https://${google_container_cluster.this.endpoint}"
 }
 
 output "cluster_ca_certificate" {

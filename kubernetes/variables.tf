@@ -1,35 +1,52 @@
-# ==========================================
-# SERVICE CONFIGURATION
-# ==========================================
+# ------------------------------------------------------------------------
+# Cluster identity
+# ------------------------------------------------------------------------
+# Read from the infra layer's ../envs/<cloud>.tfvars, which carries all three
+# environments; locals.tf indexes it with the env half of the workspace name.
 #
-# One object variable per addon. Every field is optional() with a default, so an
-# environment lists only what it changes.
-#
-# The surface here is deliberately narrow: a field exists only if an env
-# actually sets it, or if it is load-bearing. Anything a chart needs but nobody
-# varies (service type, metrics, plugin lists, node selectors, db/user names)
-# is a literal in the matching *-helm.tf instead of a knob nobody turns.
-#
-# Every service therefore carries:
-#
-#   chart_version   pinned; charts otherwise float on every apply
-#   namespace
-#   storage_size / storage_class    storage_class = null falls back to
-#                                   local.storage_class for the cloud (locals.tf)
-#   resources       null = emit nothing, let the chart's own preset apply
-#   values_extra    raw YAML merged LAST, so any unmodelled chart setting can
-#                   be reached without editing the .tf
-#
-# plus its own shape (replicas / size / architecture) and, where the chart
-# supports it, existing_secret to point at a pre-created Secret instead of
-# having Terraform generate the password into state.
+# That file declares more per-env fields than this layer needs (node sizes,
+# CIDRs). Terraform drops object attributes the declared type does not mention,
+# so only cluster_name and project are picked up here.
+variable "envs" {
+  description = "Per-environment cluster identity, keyed by env name (dev | stage | prod)."
+  type = map(object({
+    cluster_name = string
+    project      = optional(string, "")
+  }))
+}
+
+# These three come from ../envs/<cloud>.tfvars, which the infra layer also
+# reads. Their defaults MUST match the infra layer's — a variable that means one
+# thing when omitted here and another there would point the two layers at
+# different clusters.
+variable "region" {
+  description = "AWS region holding the cluster. AWS only."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "gcp_zone" {
+  description = "Zone or region of the GKE cluster. GCP only."
+  type        = string
+  default     = "us-central1-a"
+}
+
+variable "gcp_project" {
+  description = "GCP project holding the cluster. Blank uses the provider/ADC default."
+  type        = string
+  default     = ""
+}
+
 
 # ------------------------------------------------------------------------
 # Master on/off switches
 # ------------------------------------------------------------------------
+# Keyed by environment, so one envs/<cloud>.tfvars can run everything in prod
+# and nothing in dev. Everything below the toggles is sized identically across
+# environments and stays flat. Anything omitted is false.
 variable "enabled" {
-  description = "Per-service on/off switches. Anything omitted is false."
-  type = object({
+  description = "Per-service on/off switches, keyed by env name (dev | stage | prod)."
+  type = map(object({
     redis         = optional(bool, false)
     rabbitmq      = optional(bool, false)
     elasticsearch = optional(bool, false)
@@ -40,10 +57,57 @@ variable "enabled" {
     mysql         = optional(bool, false)
     meilisearch   = optional(bool, false)
     typesense     = optional(bool, false)
+
+    # AWS-only; inert on other clouds.
+    alb_controller = optional(bool, false)
+  }))
+
+  # An env mapped to {} gets every switch false via the optional() defaults
+  # above, so an omitted `enabled` block deploys nothing rather than erroring.
+  default = {
+    dev   = {}
+    stage = {}
+    prod  = {}
+  }
+
+  validation {
+    condition     = alltrue([for e in keys(var.enabled) : contains(["dev", "stage", "prod"], e)])
+    error_message = "enabled keys must be one of: dev, stage, prod."
+  }
+}
+
+
+
+
+# ------------------------------------------------------------------------
+# AWS EBS CSI driver
+# ------------------------------------------------------------------------
+# AWS-only. Installed via Helm rather than the EKS managed addon; the IRSA role
+# comes from the infra layer. See kubernetes/aws-helm.tf.
+variable "ebs_csi" {
+  description = "AWS EBS CSI driver configuration."
+  type = object({
+    chart_version = optional(string, "2.63.1")
+    namespace     = optional(string, "kube-system")
+    values_extra  = optional(string, "")
   })
   default = {}
 }
 
+# ------------------------------------------------------------------------
+# AWS Load Balancer Controller
+# ------------------------------------------------------------------------
+# AWS-only. The IAM role is created by the infra layer; this layer creates the
+# ServiceAccount and the Helm release. See kubernetes/aws-helm.tf.
+variable "alb_controller" {
+  description = "AWS Load Balancer Controller configuration."
+  type = object({
+    chart_version = optional(string, "3.5.0")
+    namespace     = optional(string, "kube-system")
+    values_extra  = optional(string, "")
+  })
+  default = {}
+}
 
 # ------------------------------------------------------------------------
 # 1. Redis
