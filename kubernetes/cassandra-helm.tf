@@ -129,5 +129,8 @@ resource "kubectl_manifest" "cassandra_cluster" {
     }
   })
 
-  depends_on = [helm_release.k8ssandra_operator]
+  depends_on = [
+    helm_release.k8ssandra_operator,
+    kubernetes_storage_class_v1.standard_sc,
+  ]
 }

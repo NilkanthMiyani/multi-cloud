@@ -23,13 +23,13 @@ redis = {
   architecture  = "standalone"
   replicas      = 0
   storage_size  = "8Gi"
-  storage_class = "gp2"
+  storage_class = "standard-sc"
 }
 
 rabbitmq = {
   replicas      = 1
   storage_size  = "8Gi"
-  storage_class = "gp2"
+  storage_class = "standard-sc"
 }
 
 elasticsearch = {
@@ -37,7 +37,7 @@ elasticsearch = {
   minimum_master_nodes = 1
   anti_affinity        = "soft"
   storage_size         = "10Gi"
-  storage_class        = "gp2"
+  storage_class        = "standard-sc"
   heap_size            = "1g"
 
   resources = {
@@ -49,7 +49,7 @@ elasticsearch = {
 cassandra = {
   size               = 1
   storage_size       = "5Gi"
-  storage_class      = "gp2"
+  storage_class      = "standard-sc"
   heap_size          = "512Mi"
   stargate_enabled   = true
   stargate_size      = 1
@@ -65,13 +65,13 @@ cassandra = {
 mongodb = {
   members       = 1
   storage_size  = "10Gi"
-  storage_class = "gp2"
+  storage_class = "standard-sc"
 }
 
 postgresql = {
   architecture  = "standalone"
   storage_size  = "8Gi"
-  storage_class = "gp2"
+  storage_class = "standard-sc"
 }
 
 clickhouse = {
@@ -79,7 +79,7 @@ clickhouse = {
   replicas       = 1
   keeper_enabled = false
   storage_size   = "50Gi"
-  storage_class  = "gp2"
+  storage_class  = "standard-sc"
 
   resources = {
     requests = { cpu = "500m", memory = "1Gi" }
@@ -90,17 +90,17 @@ clickhouse = {
 mysql = {
   architecture  = "standalone"
   storage_size  = "8Gi"
-  storage_class = "gp2"
+  storage_class = "standard-sc"
 }
 
 meilisearch = {
   replicas      = 1
   storage_size  = "10Gi"
-  storage_class = "gp2"
+  storage_class = "standard-sc"
 }
 
 typesense = {
   replicas      = 1
   storage_size  = "10Gi"
-  storage_class = "gp2"
+  storage_class = "standard-sc"
 }

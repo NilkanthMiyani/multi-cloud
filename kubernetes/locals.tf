@@ -11,9 +11,19 @@ locals {
   # layer run anywhere — the previous hardcoded "gp2" left every PVC Pending
   # on GKE, AKS and DOKS.
   #
-  #   aws -> gp2              pre-created by EKS. Note modules/aws/addon.tf
-  #                           creates "standard-sc" and demotes gp2; when that
-  #                           moves into this layer, change this to standard-sc.
+  #   aws -> standard-sc      created by aws-storage.tf in this layer, backed by
+  #                           gp2 but with Retain + WaitForFirstConsumer +
+  #                           volume expansion. EKS's stock gp2 is demoted from
+  #                           default at the same time. Because this class is
+  #                           created here rather than pre-existing, everything
+  #                           that provisions a PVC carries
+  #                           depends_on = [kubernetes_storage_class_v1.standard_sc]
+  #                           — otherwise the PVC would sit Pending until Helm
+  #                           gave up.
+  #
+  #                           Retain means PVs and their EBS volumes SURVIVE a
+  #                           destroy. Reclaim them with `kubectl get pv` +
+  #                           `kubectl delete pv <name>` or they bill forever.
   #   gcp -> standard-rwo     GKE default, CSI-backed. Preferred over the older
   #                           "standard", which uses the deprecated in-tree
   #                           gce-pd provisioner and binds Immediate rather than
@@ -21,7 +31,7 @@ locals {
   #   az  -> default          AKS default class.
   #   do  -> do-block-storage DOKS default.
   storage_class = {
-    aws = "gp2"
+    aws = "standard-sc"
     gcp = "standard-rwo"
     az  = "default"
     do  = "do-block-storage"

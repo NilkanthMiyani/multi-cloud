@@ -102,13 +102,14 @@ resource "kubectl_manifest" "typesense_cluster" {
         "namespace" = kubernetes_namespace.typesense[0].metadata[0].name
       }
       "env" = {
-        "TYPESENSE_ENABLE_CORS" = true ? "true" : "false"
+        "TYPESENSE_ENABLE_CORS" = "true"
       }
     }
   })
 
   depends_on = [
     helm_release.typesense_operator,
-    kubernetes_secret.typesense_auth
+    kubernetes_secret.typesense_auth,
+    kubernetes_storage_class_v1.standard_sc,
   ]
 }

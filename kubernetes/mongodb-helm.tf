@@ -124,6 +124,7 @@ resource "kubectl_manifest" "mongodb_cluster" {
 
   depends_on = [
     helm_release.mongodb_operator,
-    kubernetes_secret.mongodb_auth
+    kubernetes_secret.mongodb_auth,
+    kubernetes_storage_class_v1.standard_sc,
   ]
 }
