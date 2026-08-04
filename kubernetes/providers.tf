@@ -45,7 +45,8 @@ terraform {
 # gcloud ADC, DIGITALOCEAN_TOKEN) exactly as the infra layer's do.
 
 provider "aws" {
-  region = var.region != "" ? var.region : null
+  region  = var.region != "" ? var.region : null
+  profile = var.aws_profile != "" ? var.aws_profile : null
 }
 
 provider "google" {

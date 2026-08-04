@@ -68,6 +68,10 @@ resource "helm_release" "cert_manager" {
     name  = "installCRDs"
     value = "true"
   }
+
+  # cert-manager creates Services of its own, so it is subject to the same
+  # cluster-wide ALB webhook as every other chart here.
+  depends_on = [helm_release.alb_controller]
 }
 
 resource "helm_release" "k8ssandra_operator" {
@@ -130,6 +134,7 @@ resource "kubectl_manifest" "cassandra_cluster" {
   })
 
   depends_on = [
+    helm_release.alb_controller,
     helm_release.k8ssandra_operator,
     kubernetes_storage_class_v1.standard_sc,
   ]

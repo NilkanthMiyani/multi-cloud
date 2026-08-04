@@ -37,18 +37,18 @@ enabled = {
   }
 
   prod = {
-    redis         = false
-    rabbitmq      = false
-    elasticsearch = false
-    cassandra     = false
-    mongodb       = false
-    postgresql    = false
-    clickhouse    = false
-    mysql         = false
-    meilisearch   = false
-    typesense     = false
+    redis         = true
+    rabbitmq      = true
+    elasticsearch = true
+    cassandra     = true
+    mongodb       = true
+    postgresql    = true
+    clickhouse    = true
+    mysql         = true
+    meilisearch   = true
+    typesense     = true
 
-    alb_controller = false
+    alb_controller = true
   }
 }
 

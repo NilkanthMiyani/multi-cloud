@@ -4,12 +4,9 @@
 
 k8s_version = "1.36"
 
-# Blank uses the standard credential chain (env vars, shared config, instance
-# profile). Never commit real keys here.
-aws_access_key = ""
-aws_secret_key = ""
+aws_profile = "nilkanth-new"
 
-region                   = "us-east-1"
+region                   = "ap-south-1"
 availability_zones_count = 2
 subnet_cidr_bits         = 8
 
@@ -49,8 +46,8 @@ envs = {
   }
 
   prod = {
-    cluster_name = "prod-aws"
-    project      = "prod-proj"
+    cluster_name = "nilkanth-new"
+    project      = "nilkanth-new"
     vpc_cidr     = "10.1.0.0/16"
 
     node_size         = "t3.medium"

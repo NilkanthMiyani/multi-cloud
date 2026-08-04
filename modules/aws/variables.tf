@@ -67,3 +67,11 @@ variable "node_max_size" {
   description = "Maximum number of nodes in the EKS node group."
   type        = number
 }
+
+# Threaded through only so kubeconfig_cmd can carry --profile. The module's own
+# API calls use the provider, which the root already configures.
+variable "aws_profile" {
+  description = "AWS named profile, echoed into the kubeconfig command. Blank omits it."
+  type        = string
+  default     = ""
+}

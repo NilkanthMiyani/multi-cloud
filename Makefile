@@ -40,30 +40,6 @@ VERBN   = $(words $(filter $(VERBS),$(MAKECMDGOALS)))
 WORKSPACE = $(CLOUD)-$(ENV)
 VARFILE   = envs/$(CLOUD).tfvars
 
-# The aws CLI cannot read tfvars. Anything that shells out to it — `kubeconfig`,
-# and the addon layer's exec auth (`aws eks get-token`) — would otherwise
-# authenticate as whatever ~/.aws/credentials holds, which may be a different
-# account than the provider used. That fails as "No cluster found", which looks
-# like a broken apply rather than a credentials mismatch.
-#
-# Expands to a VAR=val prefix when envs/aws.tfvars supplies non-blank keys, and
-# to nothing otherwise, leaving the normal credential chain in charge.
-#
-# Set AWS_PROFILE=<name> to use a named profile instead. Prefer that: raw keys
-# authenticate the CLI for the duration of one command, whereas a profile is
-# written into the kubeconfig (--profile below), so plain `kubectl` keeps
-# working afterwards in any shell. With raw keys, `kubectl` outside make gets
-# "Unauthorized" — get-token still mints a valid token, just for the wrong
-# account, so EKS rejects the principal rather than reporting a missing cluster.
-AWS_CREDS = $(if $(filter aws,$(CLOUD)),$(if $(AWS_PROFILE),AWS_PROFILE=$(AWS_PROFILE),$(shell awk -F'"' \
-  '/^aws_access_key/ && $$2 != "" { a = $$2 } \
-   /^aws_secret_key/ && $$2 != "" { s = $$2 } \
-   END { if (a != "" && s != "") printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s", a, s }' \
-  $(VARFILE) 2>/dev/null)))
-
-# Keeps the profile in the kubeconfig update-kubeconfig writes, so a later
-# `make apply` cannot silently strip it back to the ambient credentials.
-KUBECFG_PROFILE = $(if $(filter aws,$(CLOUD)),$(if $(AWS_PROFILE),--profile $(AWS_PROFILE)))
 ifeq ($(AUTO),1)
   APPROVE := -auto-approve
 endif
@@ -164,7 +140,7 @@ plan: workspace
 
 apply: workspace
 	$(TF) apply $(APPROVE) -var-file=$(VARFILE)
-	@$(MAKE) --no-print-directory connect CLOUD=$(CLOUD) ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
+	@$(MAKE) --no-print-directory connect CLOUD=$(CLOUD) ENV=$(ENV)
 
 destroy: workspace
 	$(TF) destroy $(APPROVE) -var-file=$(VARFILE)
@@ -176,8 +152,9 @@ show: workspace
 	$(TF) show
 
 # The empty/not-found guard matters: with no cluster in state the output is
-# blank, and an unguarded expansion runs $(KUBECFG_PROFILE) as the command
-# ("--profile: not found") instead of saying the cluster isn't there.
+# blank, and running a blank command silently does nothing instead of saying the
+# cluster isn't there. The command carries --profile itself when aws_profile is
+# set — see modules/aws/outputs.tf.
 kubeconfig: workspace
 	@CMD="$$($(TF) output -raw kubeconfig_cmd 2>/dev/null)"; \
 	case "$$CMD" in \
@@ -185,7 +162,7 @@ kubeconfig: workspace
 	    echo "No cluster in state for $(WORKSPACE) — run: make apply $(CLOUD) $(ENV)"; \
 	    exit 1;; \
 	esac; \
-	$(AWS_CREDS) $$CMD $(KUBECFG_PROFILE)
+	$$CMD
 
 # Prove the kubeconfig actually works.
 #
@@ -196,8 +173,8 @@ kubeconfig: workspace
 # One API call here turns that into a named problem.
 connect: kubeconfig
 	@echo "==> Verifying cluster access for $(WORKSPACE)"
-	@if $(AWS_CREDS) kubectl get nodes >/dev/null 2>&1; then \
-	  echo "    OK — $$($(AWS_CREDS) kubectl get nodes --no-headers 2>/dev/null | grep -c ' Ready') node(s) Ready"; \
+	@if kubectl get nodes >/dev/null 2>&1; then \
+	  echo "    OK — $$(kubectl get nodes --no-headers 2>/dev/null | grep -c ' Ready') node(s) Ready"; \
 	else \
 	  echo "    FAILED — kubectl cannot reach the cluster."; echo; \
 	  $(MAKE) --no-print-directory diagnose CLOUD=$(CLOUD) ENV=$(ENV); \
@@ -210,12 +187,12 @@ diagnose:
 	echo "  context : $${ctx:-<none set>}"; \
 	if [ "$(CLOUD)" = "aws" ]; then \
 	  want="$$(printf '%s' "$$ctx" | sed -n 's/^arn:aws:eks:[^:]*:\([0-9]*\):.*/\1/p')"; \
-	  have="$$($(AWS_CREDS) aws sts get-caller-identity --query Account --output text 2>/dev/null)"; \
+	  have="$$(aws sts get-caller-identity --query Account --output text 2>/dev/null)"; \
 	  echo "  cluster account : $${want:-<unknown>}"; \
 	  echo "  CLI account     : $${have:-<not authenticated>}"; \
 	  if [ -z "$$have" ]; then \
 	    echo; echo "  The aws CLI has no working credentials."; \
-	    echo "  Fix: set aws_access_key/aws_secret_key in $(VARFILE), or AWS_PROFILE=<name>."; \
+	    echo "  Fix: set aws_profile (or aws_access_key/aws_secret_key) in $(VARFILE)."; \
 	  elif [ -z "$$want" ]; then \
 	    echo; echo "  WRONG CONTEXT — the current context is not an EKS cluster, so kubectl"; \
 	    echo "  is pointed at a different cluster entirely (possibly another cloud)."; \
@@ -223,7 +200,8 @@ diagnose:
 	  elif [ "$$want" != "$$have" ]; then \
 	    echo; echo "  ACCOUNT MISMATCH — the cluster lives in $$want, the CLI authenticates as $$have."; \
 	    echo "  get-token still mints a valid token, so EKS returns 401 rather than 'not found'."; \
-	    echo "  Fix: make connect $(CLOUD) $(ENV) AWS_PROFILE=<profile for account $$want>"; \
+	    echo "  Fix: point aws_profile in $(VARFILE) at a profile for account $$want,"; \
+	    echo "       then re-run: make connect $(CLOUD) $(ENV)"; \
 	  else \
 	    echo; echo "  Credentials match, so this is authorization, not authentication:"; \
 	    echo "  the IAM principal is not in the cluster's access entries."; \
@@ -244,7 +222,7 @@ deploy-addons: kubeconfig
 	# This layer reads the infra var-file for the cluster's identity and declares
 	# only the few fields it needs, so Terraform warns about the rest. Expected —
 	# -compact-warnings keeps it to one line.
-	@cd kubernetes && $(AWS_CREDS) terraform apply -compact-warnings -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars" -auto-approve
+	@cd kubernetes && terraform apply -compact-warnings -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars" -auto-approve
 
 # Tear the addons out while the cluster API is still reachable. Once the
 # cluster is gone this cannot run at all — the providers authenticate against
@@ -252,7 +230,7 @@ deploy-addons: kubeconfig
 destroy-addons: guard-args
 	cd kubernetes && terraform init
 	@$(call select_workspace,kubernetes)
-	@cd kubernetes && $(AWS_CREDS) terraform destroy $(APPROVE) -compact-warnings \
+	@cd kubernetes && terraform destroy $(APPROVE) -compact-warnings \
 	  -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars"
 
 # The whole environment, in the only order that works.

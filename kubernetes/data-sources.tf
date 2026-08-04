@@ -43,21 +43,21 @@ locals {
     one(data.digitalocean_kubernetes_cluster.this[*].kube_config[0].cluster_ca_certificate),
   ))
 
-  # Per-cloud exec plugin. Each mints a short-lived token on every API call, so
-  # nothing can expire mid-apply the way a baked-in kubeconfig token can.
-  #
-  #   aws  --region is explicit; without it the CLI uses its own default, which
-  #        may be a different region than the cluster.
-  #   do   exec-credential takes the cluster UUID, not its name.
   exec_auth = {
+    # --profile goes first: it is a global CLI option, and prepending keeps it
+    # ahead of the eks subcommand. Omitted entirely when blank, so the default
+    # credential chain still applies.
     aws = {
       command = "aws"
-      args = [
-        "--region", var.region,
-        "eks", "get-token",
-        "--cluster-name", local.cfg.cluster_name,
-        "--output", "json",
-      ]
+      args = concat(
+        var.aws_profile != "" ? ["--profile", var.aws_profile] : [],
+        [
+          "--region", var.region,
+          "eks", "get-token",
+          "--cluster-name", local.cfg.cluster_name,
+          "--output", "json",
+        ],
+      )
     }
     gcp = {
       command = "gke-gcloud-auth-plugin"

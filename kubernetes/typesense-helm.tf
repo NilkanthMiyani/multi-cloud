@@ -108,6 +108,7 @@ resource "kubectl_manifest" "typesense_cluster" {
   })
 
   depends_on = [
+    helm_release.alb_controller,
     helm_release.typesense_operator,
     kubernetes_secret.typesense_auth,
     kubernetes_storage_class_v1.standard_sc,

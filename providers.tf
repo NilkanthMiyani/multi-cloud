@@ -25,8 +25,10 @@ terraform {
 provider "aws" {
   region = var.region
 
-  # Blank keys fall back to the standard AWS credential chain (env vars, shared
-  # config/credentials file, instance profile, etc.).
+  # Blank falls back to the standard AWS credential chain (env vars, shared
+  # config/credentials file, instance profile, etc.). variables.tf rejects
+  # setting a profile and static keys together.
+  profile    = var.aws_profile != "" ? var.aws_profile : null
   access_key = var.aws_access_key != "" ? var.aws_access_key : null
   secret_key = var.aws_secret_key != "" ? var.aws_secret_key : null
 }

@@ -30,7 +30,16 @@ output "cluster_ca_certificate" {
   sensitive   = true
 }
 
+# --profile is what makes plain `kubectl` work afterwards: update-kubeconfig
+# writes it into the context's exec env, so kubectl re-runs `aws eks get-token`
+# under the same identity Terraform used. Without it kubectl falls back to
+# whatever ~/.aws/credentials holds, which may be a different account.
 output "kubeconfig_cmd" {
   description = "Command to point kubectl at this cluster."
-  value       = "aws eks update-kubeconfig --region ${data.aws_region.current.name} --name ${aws_eks_cluster.this.name}"
+  value = join(" ", compact([
+    "aws eks update-kubeconfig",
+    "--region", data.aws_region.current.name,
+    "--name", aws_eks_cluster.this.name,
+    var.aws_profile != "" ? "--profile ${var.aws_profile}" : "",
+  ]))
 }

@@ -116,6 +116,16 @@ It distinguishes four cases: no credentials, wrong AWS account, a context
 pointing at a different cluster entirely, and credentials that are correct but
 whose IAM principal is missing from the cluster's access entries.
 
+**On AWS, pass `AWS_PROFILE` if you want plain `kubectl` to work.** With keys in
+`envs/aws.tfvars`, `make` injects them for its own commands, but the kubeconfig
+it writes carries no credentials — `kubectl` re-runs `aws eks get-token` in your
+shell against `~/.aws/credentials`, which may be a different account. `connect`
+checks for exactly this and warns rather than reporting a false OK:
+
+```bash
+make apply aws prod AWS_PROFILE=multicloud    # bakes AWS_PROFILE into the kubeconfig
+```
+
 ## Enabling a database
 
 Edit `kubernetes/envs/<cloud>.tfvars`. The toggle block at the top is the only thing you normally touch, and it is keyed by environment:

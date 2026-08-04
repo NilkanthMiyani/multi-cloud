@@ -101,6 +101,6 @@ resource "helm_release" "clickhouse" {
     var.clickhouse.values_extra,
   ]
 
-  depends_on = [kubernetes_storage_class_v1.standard_sc]
+  depends_on = [kubernetes_storage_class_v1.standard_sc, helm_release.alb_controller]
 
 }
