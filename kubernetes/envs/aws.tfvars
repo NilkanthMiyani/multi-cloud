@@ -94,7 +94,7 @@ cassandra = {
   mgmt_api_heap      = "64Mi"
 
   resources = {
-    requests = { cpu = "1", memory = "2Gi" }
+    requests = { cpu = "500m", memory = "1536Mi" }
     limits   = { cpu = "2", memory = "2Gi" }
   }
 }

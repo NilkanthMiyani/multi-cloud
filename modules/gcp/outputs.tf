@@ -2,11 +2,6 @@ locals {
   gcp_location_flag = length(split("-", google_container_cluster.this.location)) == 3 ? "--zone" : "--region"
 }
 
-output "cluster_name" {
-  description = "Name of the provisioned GKE cluster."
-  value       = google_container_cluster.this.name
-}
-
 # GKE returns a bare IP (e.g. "34.170.28.68"), so the scheme is added here.
 # Every module emits a full URL, which is what the kubernetes/helm providers'
 # `host` argument requires.

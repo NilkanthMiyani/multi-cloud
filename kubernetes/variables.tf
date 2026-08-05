@@ -418,3 +418,82 @@ variable "typesense" {
   })
   default = {}
 }
+
+
+# ------------------------------------------------------------------------
+# Cloud credentials — same wiring as the infra layer
+# ------------------------------------------------------------------------
+# Read from ../envs/<cloud>.tfvars, so both layers resolve the same identity
+# from one place. Blank falls back to the cloud's ambient chain. Declaring but
+# NOT using these was what made the addon layer 401 on DigitalOcean while the
+# infra layer authenticated fine off the same file.
+
+variable "aws_access_key" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "aws_secret_key" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "azure_subscription_id" {
+  type    = string
+  default = ""
+}
+
+variable "azure_tenant_id" {
+  type    = string
+  default = ""
+}
+
+variable "azure_client_id" {
+  type    = string
+  default = ""
+}
+
+variable "azure_client_secret" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "gcp_region" {
+  type    = string
+  default = ""
+}
+
+variable "gcp_credentials" {
+  type    = string
+  default = ""
+}
+
+variable "do_token" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+
+# ------------------------------------------------------------------------
+# Infra-only pass-through — NOTHING HERE IS READ
+# ------------------------------------------------------------------------
+# ../envs/<cloud>.tfvars also carries values only the infra layer needs (node
+# sizing, CIDRs). Terraform warns once per value that is set but not declared,
+# and a warning list nobody reads hides the ones that matter — "Helm release
+# has a failed status" arrives in the same stream.
+#
+# Adding an infra-only variable to envs/<cloud>.tfvars? Add it here too.
+
+variable "k8s_version" { default = null }
+variable "availability_zones_count" { default = null }
+variable "subnet_cidr_bits" { default = null }
+variable "node_ami_type" { default = null }
+variable "public_access_cidrs" { default = null }
+variable "location" { default = null }
+variable "do_region" { default = null }
+variable "do_k8s_version" { default = null }
+variable "do_vpc_cidr" { default = null }

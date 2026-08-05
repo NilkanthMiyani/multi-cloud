@@ -1,8 +1,3 @@
-output "cluster_name" {
-  description = "Name of the provisioned AKS cluster."
-  value       = azurerm_kubernetes_cluster.this.name
-}
-
 # AKS returns a bare FQDN, so the scheme is added here — every module emits a
 # full URL for the providers' `host` argument.
 output "cluster_endpoint" {

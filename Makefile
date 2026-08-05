@@ -264,14 +264,20 @@ diagnose:
 # ---------------------------------------------------------
 # Master Addon Deployment
 # ---------------------------------------------------------
-deploy-addons: kubeconfig
+# Deliberately does NOT depend on kubeconfig. This layer finds the cluster
+# through its cloud API and authenticates via exec (see data-sources.tf), so it
+# never reads ~/.kube/config. Regenerating it here would overwrite whatever
+# context the operator set up — dropping a --profile they added by hand, which
+# leaves kubectl on the ambient credentials and returns "Unauthorized".
+deploy-addons: guard-args
 	@echo "Deploying addons via Terraform for $(WORKSPACE)..."
 	cd kubernetes && terraform init
 	@$(call select_workspace,kubernetes)
 	# This layer reads the infra var-file for the cluster's identity and declares
-	# only the few fields it needs, so Terraform warns about the rest. Expected —
-	# -compact-warnings keeps it to one line.
-	@cd kubernetes && $(AWS_CREDS) terraform apply -compact-warnings -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars" -auto-approve
+	# only the few fields it needs, so Terraform warns about the infra-only
+	# values in it. Expected, and shown in full so a real warning is not lost
+	# among them.
+	@cd kubernetes && $(AWS_CREDS) terraform apply $(APPROVE) -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars"
 
 # Tear the addons out while the cluster API is still reachable. Once the
 # cluster is gone this cannot run at all — the providers authenticate against
@@ -279,7 +285,7 @@ deploy-addons: kubeconfig
 destroy-addons: guard-args
 	cd kubernetes && terraform init
 	@$(call select_workspace,kubernetes)
-	@cd kubernetes && $(AWS_CREDS) terraform destroy $(APPROVE) -compact-warnings \
+	@cd kubernetes && $(AWS_CREDS) terraform destroy $(APPROVE) \
 	  -var-file="../envs/$(CLOUD).tfvars" -var-file="envs/$(CLOUD).tfvars"
 
 # The whole environment, in the only order that works.

@@ -40,35 +40,47 @@ terraform {
   }
 }
 
-# Cloud providers, configured only enough to resolve the cluster lookup.
-# Credentials come from the ambient chain (env vars, aws configure, az login,
-# gcloud ADC, DIGITALOCEAN_TOKEN) exactly as the infra layer's do.
+# ------------------------------------------------------------------------
+# Cloud providers — used only to look up the cluster (data-sources.tf)
+# ------------------------------------------------------------------------
+# Credentials are wired exactly as the infra layer wires them, from the same
+# ../envs/<cloud>.tfvars. Blank falls back to the ambient chain (env vars,
+# aws configure, az login, gcloud ADC, DIGITALOCEAN_TOKEN).
 
 provider "aws" {
-  region = var.region != "" ? var.region : null
+  region     = var.region != "" ? var.region : null
+  access_key = var.aws_access_key != "" ? var.aws_access_key : null
+  secret_key = var.aws_secret_key != "" ? var.aws_secret_key : null
 }
 
 provider "google" {
-  project = var.gcp_project != "" ? var.gcp_project : null
+  project     = var.gcp_project != "" ? var.gcp_project : null
+  region      = var.gcp_region != "" ? var.gcp_region : null
+  credentials = var.gcp_credentials != "" ? file(var.gcp_credentials) : null
 }
 
 provider "azurerm" {
   features {}
+
+  subscription_id = var.azure_subscription_id != "" ? var.azure_subscription_id : null
+  tenant_id       = var.azure_tenant_id != "" ? var.azure_tenant_id : null
+  client_id       = var.azure_client_id != "" ? var.azure_client_id : null
+  client_secret   = var.azure_client_secret != "" ? var.azure_client_secret : null
 }
 
-provider "digitalocean" {}
+provider "digitalocean" {
+  token = var.do_token != "" ? var.do_token : null
+}
 
-# All three providers connect straight to the cluster API. Endpoint and CA come
-# from the infra layer's state for THIS workspace (see remote-state.tf), and the
-# exec block mints a fresh token on every API call via the cloud's own CLI.
-#
-# Previously these read ~/.kube/config, which is not tied to the selected
-# workspace: planning aws-dev while the current context was the GCP cluster
-# proposed writing a StorageClass into GCP. Nothing here reads that file now, so
-# the addon layer can only ever talk to the cluster the workspace names.
-#
-# exec also avoids the expiry problem — a kubeconfig token baked in at plan time
-# can go stale during a long apply.
+
+# ------------------------------------------------------------------------
+# Kubernetes providers — connect straight to the cluster API
+# ------------------------------------------------------------------------
+# Endpoint and CA come from the cloud lookup in data-sources.tf; exec mints a
+# fresh token per API call via the cloud's own CLI, so nothing expires
+# mid-apply. Nothing here reads ~/.kube/config, which is not tied to the
+# selected workspace — planning aws-dev while the current context was GCP once
+# proposed writing a StorageClass into the wrong cluster.
 
 provider "kubernetes" {
   host                   = local.cluster_endpoint

@@ -4,6 +4,9 @@
 
 k8s_version = "1.36"
 
+# Blank uses the standard credential chain (env vars, shared config, instance
+# profile). The Makefile exports these for anything that shells out to the aws
+# CLI, so Terraform and the CLI stay on one identity.
 aws_access_key = ""
 aws_secret_key = ""
 

@@ -1,8 +1,3 @@
-output "cluster_name" {
-  description = "Name of the provisioned DOKS cluster."
-  value       = digitalocean_kubernetes_cluster.this.name
-}
-
 # DOKS already returns "https://…", so no scheme fix-up is needed here.
 output "cluster_endpoint" {
   description = "API server endpoint of the DOKS cluster."

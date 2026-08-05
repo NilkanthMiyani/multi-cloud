@@ -1,10 +1,5 @@
 data "aws_region" "current" {}
 
-output "cluster_name" {
-  description = "Name of the provisioned EKS cluster."
-  value       = aws_eks_cluster.this.name
-}
-
 # EKS already returns "https://…", so no scheme fix-up is needed here.
 output "cluster_endpoint" {
   description = "API server endpoint of the EKS cluster."
@@ -12,8 +7,6 @@ output "cluster_endpoint" {
 }
 
 # The addon layer looks these up by name rather than consuming the outputs, so
-# it stays decoupled from infra state. Exposed for `terraform output` and for
-# anything that does want to wire them directly.
 output "lb_controller_role_arn" {
   description = "IAM role ARN for the AWS Load Balancer Controller service account."
   value       = module.lb_role.iam_role_arn

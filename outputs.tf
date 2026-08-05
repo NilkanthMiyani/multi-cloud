@@ -48,3 +48,16 @@ output "resource_group_name" {
   description = "Resource group holding the cluster (Azure only)."
   value       = one(module.azure[*].resource_group_name)
 }
+
+# AWS-only; null on every other cloud. The addon layer finds these roles by
+# name, so nothing consumes them — they are here to be read when an IRSA
+# binding needs checking.
+output "lb_controller_role_arn" {
+  description = "IAM role ARN for the AWS Load Balancer Controller (AWS only)."
+  value       = one(module.aws[*].lb_controller_role_arn)
+}
+
+output "ebs_csi_role_arn" {
+  description = "IAM role ARN for the EBS CSI driver (AWS only)."
+  value       = one(module.aws[*].ebs_csi_role_arn)
+}
