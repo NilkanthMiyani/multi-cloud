@@ -42,7 +42,6 @@ make destroy-all  aws dev      # addons, then cluster
 | `make destroy-addons <cloud> <env>` | remove addons, keep the cluster |
 | `make destroy-all <cloud> <env>` | addons then cluster, in the required order |
 | `make connect <cloud> <env>` | write kubeconfig and verify it works |
-| `make diagnose <cloud> <env>` | why `kubectl` can't reach the cluster |
 | `make output` / `show` / `kubeconfig` | outputs, state, kubeconfig |
 | `make fmt` / `validate` / `upgrade` | format, validate, re-init |
 
