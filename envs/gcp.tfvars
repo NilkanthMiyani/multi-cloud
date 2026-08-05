@@ -4,7 +4,7 @@
 
 k8s_version = "1.36"
 
-gcp_project = "project-f26ca60a-38f7-49d3-b7b"
+gcp_project = ""
 
 gcp_credentials = ""
 

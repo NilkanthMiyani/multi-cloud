@@ -59,18 +59,33 @@ variable "tags" {
 # --- AWS / EKS -------------------------------------------------------------
 # Flat variables (only consumed in the "aws" workspace).
 
+# Required on aws workspaces. Blank does NOT mean "no credentials" — the
+# provider falls back to the default chain and builds in whatever account
+# ~/.aws/credentials happens to hold, with no error and no indication that a
+# different account was used. The gate is scoped to aws so the other three
+# clouds, whose tfvars never set these, are unaffected.
 variable "aws_access_key" {
-  description = "AWS access key. Leave blank to use the standard credential chain (env vars, shared config, instance profile)."
+  description = "AWS access key. Required on aws workspaces."
   type        = string
   default     = ""
   sensitive   = true
+
+  validation {
+    condition     = split("-", terraform.workspace)[0] != "aws" || var.aws_access_key != ""
+    error_message = "aws_access_key is empty in envs/aws.tfvars. Set it (with aws_secret_key) — a blank value silently falls back to ~/.aws/credentials and can build in the wrong account."
+  }
 }
 
 variable "aws_secret_key" {
-  description = "AWS secret key. Leave blank to use the standard credential chain (env vars, shared config, instance profile)."
+  description = "AWS secret key. Required on aws workspaces."
   type        = string
   default     = ""
   sensitive   = true
+
+  validation {
+    condition     = split("-", terraform.workspace)[0] != "aws" || var.aws_secret_key != ""
+    error_message = "aws_secret_key is empty in envs/aws.tfvars. Set it (with aws_access_key) — a blank value silently falls back to ~/.aws/credentials and can build in the wrong account."
+  }
 }
 
 variable "availability_zones_count" {

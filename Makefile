@@ -152,9 +152,35 @@ validate: $(STAMP)
 plan: workspace
 	$(TF) plan -var-file=$(VARFILE)
 
+# Prints the connect command instead of running it. Which profile/login this
+# workstation uses is not something Terraform can know, and guessing it is what
+# produced "cluster not found" and 401s before. Shown once, run once, and the
+# kubeconfig remembers it.
+#
+# The addon layer is unaffected either way: it finds the cluster through its
+# cloud API and authenticates via exec, never through kubeconfig.
 apply: workspace
 	$(TF) apply $(APPROVE) -var-file=$(VARFILE)
-	@$(MAKE) --no-print-directory connect CLOUD=$(CLOUD) ENV=$(ENV)
+	@echo
+	@echo "════════════════════════════════════════════════════════════"
+	@echo " Connect to your cluster:"
+	@echo
+	@CMD="$$($(TF) output -raw kubeconfig_cmd 2>/dev/null)"; \
+	if [ -z "$$CMD" ]; then \
+	  echo "   (no cluster in state — nothing to connect to)"; \
+	elif [ "$(CLOUD)" = "aws" ]; then \
+	  echo "   $$CMD --profile <YOUR_PROFILE>"; \
+	  echo; \
+	  echo " No named profile yet? Create one, then rerun the line above:"; \
+	  echo; \
+	  echo "   aws configure --profile <YOUR_PROFILE>"; \
+	else \
+	  echo "   $$CMD"; \
+	fi
+	@echo
+	@echo " Then verify:   kubectl get nodes"
+	@echo " Or let make do it:   make connect $(CLOUD) $(ENV)"
+	@echo "════════════════════════════════════════════════════════════"
 
 destroy: workspace
 	$(TF) destroy $(APPROVE) -var-file=$(VARFILE)
